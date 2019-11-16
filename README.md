@@ -1,2 +1,0 @@
-# gophercises
-Doing gopercises problems
