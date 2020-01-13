@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <link rel="icon" type="image/png" href="https://hackernoon.com/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <link rel="canonical" href="https://hackernoon.com/practical-functional-programming-6d7932abc58b" />
+    
+
+    <title>Practical Functional Programming - By Steven Heidel</title>
+    <!-- <link rel="stylesheet" href="https://firebasestorage.googleapis.com/v0/b/hackernoon/o/story.css?alt=media&token=8adf3bd2-28b6-4122-89bf-f9f52a10294d" /> -->
+    <link rel="stylesheet" href="https://pro.fontawesome.com/releases/v5.7.1/css/all.css" integrity="sha384-6jHF7Z3XI3fF4XZixAuSu0gGKrXwoX/w3uFPxC56OtjChio7wtTGJWRW53Nhx6Ev"
+          crossorigin="anonymous">
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:site" content="@hackernoon" />
+    
+    <meta name="twitter:creator" content="@stevenheidel" />
+    
+    <meta property="og:url" content="https://hackernoon.com/practical-functional-programming-6d7932abc58b" />
+    <meta property="og:title" content="Practical Functional Programming" />
+    <meta property="og:description" content="The following is reformatted from a presentation I gave at LinkedIn last year. The presentation attempted to explain functional programming without using concepts like “monads” or “immutability” or “side effects”. Instead it focuses on how thinking about composition can make you a better programmer, regardless of what language you use." />
+    
+    <meta property="og:image" content="https://hackernoon.com/https://images.unsplash.com/photo-1550439062-609e1531270e?ixlib=rb-1.2.1&q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=1080&fit=max&ixid=eyJhcHBfaWQiOjEwMDk2Mn0" />
+    
+
+    
+    <link href="/story.css" rel="stylesheet">
+    
+    <link href="/base.css" rel="stylesheet">
+    <link href="/subscribe-form.css" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.10/dist/vue.min.js"></script>
+    <script src="/content.js"></script>
+
+    <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-WGQVQ44');</script>
+    <!-- End Google Tag Manager -->
+  </head>
+
+  <body>
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WGQVQ44"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
+
+    <div id="root">
+      <header id="header">
+        <nav>
+          <a href="https://hackernoon.com" class="logo"><img src="https://hackernoon.com/Devimg/logo-hn.png"/><img src="https://hackernoon.com/Devimg/hn-logo.png" class="mobile"/></a>
+          <div class="desktop-nav">
+            <div class="spacer"></div>
+            <div class="search-container" v-bind:class="{ active: searchFocus }">
+              <input ref="search" class="search-input" v-model="search" @keyup.enter="submitSearch" @blur="searchFocus=false" />
+              <i class="fas fa-search" @mousedown.stop.prevent="submitSearch"></i>
+            </div>
+            <a href="https://twitter.com/hackernoon" target="_blank"><i class="fab fa-twitter"></i></a>
+            <a href="https://www.facebook.com/hackernoon" target="_blank"><i class="fab fa-facebook-f"></i></a>
+            <a href="https://www.youtube.com/hackernoon" target="_blank"><i class="fab fa-youtube"></i></a>
+            <a href="#subscribe-embed"><button class="outline">Subscribe</button></a>
+            <span v-cloak v-if="user && userLoaded">
+              <a :href="profileLink"><img :src="profileImage" class="profile" /></a>
+            </span>
+            <span v-cloak v-if="!user && userLoaded">
+              <a :href="loginLink"><button class="outline">Get Started</button></a>
+            </span>
+
+            <div
+              class="darkmode"
+              @click="darkMode = !darkMode"
+              :class="darkMode ? 'dark' : 'light'"
+            >
+              <i class="light fas fa-sun"></i>
+              <i class="dark fas fa-moon"></i>
+            </div>
+          </div>
+        </nav>
+      </header>
+
+      <div id="top">
+        <button class="mobile-menu-toggle" :class="{ 'mobile-open': mobileMenuOpen }" @click="toggleMobileMenu"><i class="fas fa-bars"></i></button>
+        <div class="subnav" :class="{ 'mobile-open': mobileMenuOpen }" @mouseleave="!mobileMenuOpen && closeNav()" v-cloak v-if="nav">
+          <div class="mobile-back" :class="{ 'mobile-open': (mobileMenuOpen && activeNav !== '') }">
+            <button @click="activeNav = ''"><i class="fas fa-arrow-left"></i></button>
+          </div>
+          <a v-for="category in nav" :href="category.href"
+             :class="{ sponsor: category.sponsor }"
+             @mouseover="navHover(category, $event)"
+             @click="navClick(category, $event)">
+            {{category.text}}
+          </a>
+
+          <div class="dropdown" v-bind:class="{ active: activeNav!=='' }" @mouseover="closeNavReset">
+            <div class="category" v-for="category in nav" :key="category.name">
+              <div class="section" v-for="(section, idx) in category.sections" :key="idx" :class="{ active: activeNav === category.name }">
+                <div class="heading">
+                  <div class="line"></div>
+                  <a :href="section.heading.href">{{section.heading.text}}</a>
+                </div>
+
+                <ul class="links">
+                  <li v-for="(link, linkIdx) in section.links" :key="linkIdx">
+                    <a :href="link.href">{{link.text}}</a>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ads">
+          <a v-cloak v-if="ad" class="sponsor" @click="recordAdClick" :href="ad.link" target="_blank">
+            <img class="image" :src="ad.image" :alt="ad.companyName" />
+            {{ad.text}}
+          </a>
+        </div>
+      </div>
+
+      <div class="story story-container" :class="darkMode ? 'dark' : 'light'">
+        <div class="author">
+          <a href="/@stevenheidel"><div class="avatar" style="background-image: url('https://hackernoon.com/avatars/QlGsBtM2mvgzjlG7cS9UX3SIHAJ3.png')"></div></a>
+          <div class="name">
+            <a href="/@stevenheidel"><strong>Steven Heidel</strong></a>
+            <p>I develop software and develop people. https://stevenheidel.com</p>
+            <div class="links">
+              
+              <a target="_blank" rel="noopener noreferrer" href="https://twitter.com/stevenheidel"><i class="fab fa-twitter"></i></a>
+              
+              
+              
+              
+            </div>
+            <div class="subscribe">
+              <button><i class="far fa-envelope"></i> Message</button>
+            </div>
+          </div>
+        </div>
+        <h1 class="title">Practical Functional Programming</h1>
+        <div class="story-meta">
+          <div class="date">
+            
+              January 9th 2020
+            
+          </div>
+          <div class="share">
+            
+            
+              
+            
+            
+            
+            <a class="twitter" target="_blank" rel="noopener noreferrer" href="https://twitter.com/intent/tweet?text=Practical%20Functional%20Programming&url=https%3A%2F%2Fhackernoon.com%2Fpractical-functional-programming-6d7932abc58b&via=stevenheidel&hashtags=functionalprogramming,programming,computerscience"><i class="fab fa-twitter"></i> Tweet This</a>
+          </div>
+        </div>
+
+        <div class="content" v-pre>
+          
+            
+            <img src="https://images.unsplash.com/photo-1550439062-609e1531270e?ixlib=rb-1.2.1&q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=1080&fit=max&ixid=eyJhcHBfaWQiOjEwMDk2Mn0" />
+          
+          
+            <p class="image-attribution">
+              Photo by <a target="_blank" rel="noopener noreferrer" href="https://unsplash.com/@max_duz">Max Duzij</a>
+              
+                 on Unsplash
+              
+            </p>
+          
+          <div class="paragraph"><em>The following is reformatted from a presentation I gave at LinkedIn last year. The presentation attempted to explain functional programming without using concepts like “monads” or “immutability” or “side effects”. Instead it focuses on how thinking about </em><strong><em>composition</em></strong><em> can make you a better programmer, regardless of what language you use.</em></div><div class="paragraph">40 years ago, on October 17th, 1977, the Turing Award was presented to John Backus for his contribution to the design of high-level programming systems, most notably the Fortran programming language. All Turing Award winners are given the opportunity to present a lecture on a topic of their choice during the year in which they receive the award. As the creator of the Fortran programming language, one may have expected Backus to lecture on the benefits of Fortran and future developments in the language. Instead, he gave a lecture entitled <a href="https://www.cs.ucf.edu/~dcm/Teaching/COT4810-Fall%202012/Literature/Backus.pdf">Can programming be liberated from the Von Neumann style?</a> in which he criticized some of the mainstream languages of the day, including Fortran, for their shortcomings. He also proposed an alternative: a <strong>functional style of programming</strong>.</div><div class="image-container"><img src="https://hackernoon.com/photos/3nhao37bBEfHA9RTQ0WNVWfXPD02-zy6324c" alt=""/></div><div class="paragraph">The lecture contrasts conventional programs and their “inability to effectively use powerful <strong>combining</strong> forms” with functional programs which are “founded on the use of <strong>combining</strong> forms.” Functional programming has received renewed interest in the past several years due to the rise of highly scalable and parallel computing. But the main benefit of functional programming is one that can be realized regardless of if your program is going to be parallelized or not: functional programming is better at <strong>composition</strong>.</div><div class="paragraph">Composition is the ability to assemble complex behavior by aggregating simple pieces. In computer science classes much emphasis is put on abstraction: taking a large problem and splitting it up into tractable pieces. Less emphasis is put on the reverse: once you have the small pieces implemented then how do you connect them together. It seems that some functions and systems are easy to connect together whereas others are much messier. But we need to take a step back and ask: what properties of these functions and systems make them easy to compose? What properties make them hard to compose? After you’ve read through enough code the pattern starts to emerge, and this pattern is the key to understanding functional programming.</div><div class="Divider"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="paragraph">Let’s start by looking at a function that composes really well:</div><div class="code-container"><pre style="display:block;overflow-x:auto;background:black;color:#eaeaea;padding:30px"><code><span class="hljs-function">String <span style="color:#7aa6da">addFooter</span><span style="color:#e78c45">(String message)</span> </span>{
+  <span style="color:#c397d8">return</span> message.concat(<span style="color:#b9ca4a">&quot; - Sent from LinkedIn&quot;</span>);
+}</code></pre></div><div class="paragraph">We can easily compose that with another function without needing to make any changes to our original code:</div><div class="code-container"><pre style="display:block;overflow-x:auto;background:black;color:#eaeaea;padding:30px"><code><span class="hljs-function"><span style="color:#c397d8">boolean</span> <span style="color:#7aa6da">validMessage</span><span style="color:#e78c45">(String message)</span> </span>{
+  <span style="color:#c397d8">return</span> characterCount(addFooter(message)) &lt;= <span style="color:#e78c45">140</span>;
+}</code></pre></div><div class="paragraph">That’s great, we took a small piece of functionality and composed it together to make something bigger. Users of the <pre><code>validMessage</code></pre> function don’t even need to be aware of the fact that that function was built from a smaller one; that is abstracted away as an implementation detail.</div><div class="paragraph">Now let’s take a look at a function that doesn’t compose so well:</div><div class="code-container"><pre style="display:block;overflow-x:auto;background:black;color:#eaeaea;padding:30px"><code><span class="hljs-function">String <span style="color:#7aa6da">firstWord</span><span style="color:#e78c45">(String message)</span> </span>{
+  String[] words = message.split(<span style="color:#b9ca4a">&#x27; &#x27;</span>);
+  <span style="color:#c397d8">if</span> (words.length &gt; <span style="color:#e78c45">0</span>) {
+    <span style="color:#c397d8">return</span> words[<span style="color:#e78c45">0</span>];
+  } <span style="color:#c397d8">else</span> {
+    <span style="color:#c397d8">return</span> <span style="color:#c397d8">null</span>;
+  }
+}</code></pre></div><div class="paragraph">And then try to compose it within another function:</div><div class="code-container"><pre style="display:block;overflow-x:auto;background:black;color:#eaeaea;padding:30px"><code><span style="color:#969896">// “Hello world” -&gt; “HelloHello”</span>
+duplicate(firstWord(message));</code></pre></div><div class="paragraph">Although simple at first glance, if we ran the above code with an empty message then we would hit the dreaded <pre><code>NullPointerException</code></pre>. One option would be to modify the duplicate function to handle the fact that its input can sometimes be <pre><code>null</code></pre>:</div><div class="code-container"><pre style="display:block;overflow-x:auto;background:black;color:#eaeaea;padding:30px"><code><span class="hljs-function">String <span style="color:#7aa6da">duplicateBad</span><span style="color:#e78c45">(String word)</span> </span>{
+  <span style="color:#c397d8">if</span> (word == <span style="color:#c397d8">null</span>) {
+    <span style="color:#c397d8">return</span> <span style="color:#c397d8">null</span>;
+  } <span style="color:#c397d8">else</span> {
+    <span style="color:#c397d8">return</span> word.concat(word);
+  }
+}</code></pre></div><div class="paragraph">Now we are able to use this function with the <pre><code>firstWord</code></pre> function from earlier and simply pass on the <pre><code>null</code></pre> value. But this is against the point of composition and abstraction. If you’re constantly having to go in and modify the component parts every time you want to make something bigger, then it’s not composable. Ideally you want functions to be like black boxes where the exact implementation details don’t matter.</div><blockquote>Null objects do not compose well.</blockquote><div class="paragraph">Let’s take a look at an alternative implementation that uses the Java 8 <pre><code>Optional</code></pre> type (also called <pre><code>Option</code></pre> or <pre><code>Maybe</code></pre> in other languages):</div><div class="code-container"><pre style="display:block;overflow-x:auto;background:black;color:#eaeaea;padding:30px"><code><span class="hljs-function">Optional&lt;String&gt; <span style="color:#7aa6da">firstWord</span><span style="color:#e78c45">(String message)</span> </span>{
+  String[] words = message.split(<span style="color:#b9ca4a">&#x27; &#x27;</span>);
+  <span style="color:#c397d8">if</span> (words.length &gt; <span style="color:#e78c45">0</span>) {
+    <span style="color:#c397d8">return</span> Optional.of(words[<span style="color:#e78c45">0</span>]);
+  } <span style="color:#c397d8">else</span> {
+    <span style="color:#c397d8">return</span> Optional.empty();
+  }
+}</code></pre></div><div class="paragraph">Now we try to compose it with the unmodified <pre><code>duplicate</code></pre> function from earlier:</div><div class="code-container"><pre style="display:block;overflow-x:auto;background:black;color:#eaeaea;padding:30px"><code><span style="color:#969896">// &quot;Hello World&quot; -&gt; Optional.of(&quot;HelloHello&quot;)</span>
+firstWord(input).map(<span style="color:#c397d8">this</span>::duplicate)</code></pre></div><div class="paragraph">It works! The optional takes care of the fact that <pre><code>firstWord</code></pre> sometimes doesn’t return a value. If <pre><code>Optional.empty()</code></pre> is returned from <pre><code>firstWord</code></pre> then the <pre><code>.map</code></pre> function will simply skip running the <pre><code>duplicate</code></pre> function. We were able to easily combine the functions without having to modify the internals of <pre><code>duplicate</code></pre>. Contrast this with the null case where we had to create the <pre><code>duplicateBad</code></pre> function. In other words: <pre><code>null</code></pre> objects do not compose well but <pre><code>Optionals</code></pre> do.</div><div class="paragraph">Functional programmers are <em>obsessed</em> with making things composable in this way. As a result, they have created a large toolbox filled with structures that make non-composable code composable. One of those tools is the Optional type for dealing with functions that only return a valid output <em>some of the time</em>. Let’s take a look at some of the other tools that have been created.</div><div class="paragraph">Asynchronous code is notoriously difficult to compose. Asynchronous functions typically accept “callbacks” which are run when the asynchronous part of the call is completed. For example, a function <pre><code>getData</code></pre> could make an HTTP call to a web service and then run a function on the returned data. But what if you want to make another HTTP call right after that? And then another? Doing this quickly leads you into a situation affectionately known as callback hell.</div><div class="code-container"><pre style="display:block;overflow-x:auto;background:black;color:#eaeaea;padding:30px"><code>getData(function(a) {  
+    getMoreData(a, function(b) {
+        getMoreData(b, function(c) { 
+            getMoreData(c, function(d) { 
+                getMoreData(d, function(e) { 
+                    <span style="color:#969896">// ...</span>
+                });
+            });
+        });
+    });
+});</code></pre></div><div class="paragraph">In a larger web app for instance this leads to highly nested spaghetti code. It’s also not very composable. Imagine trying to separate out one of the <pre><code>getMoreData</code></pre> functions into its own method. Or imagine trying to add error handling to this nested function. The reason it’s not composable is because there are so many contextual requirements on each block of code: the innermost block needs access to the results from <pre><code>a</code></pre>, <pre><code>b</code></pre>, <pre><code>c</code></pre>, etc. etc.</div><blockquote>Values are easier to compose together than functions</blockquote><div class="paragraph">Let’s look inside the functional programmer’s toolbox for an alternative: the <pre><code>Promise</code></pre> (sometimes called a <pre><code>Future</code></pre> in other languages). Here’s what the code looks like now:</div><div class="code-container"><pre style="display:block;overflow-x:auto;background:black;color:#eaeaea;padding:30px"><code>getData()
+  .then(getMoreData)
+  .then(getMoreData)
+  .then(getMoreData)
+  .<span style="color:#c397d8">catch</span>(errorHandler)</code></pre></div><div class="paragraph">The <pre><code>getData</code></pre> functions now return a <pre><code>Promise</code></pre> <em>value</em> instead of accepting a callback function. Values are easier to compose together than functions because they don’t have the same preconditions that a callback would have. It’s now trivial to add error handling to the entire block due to the functionality that the <pre><code>Promise</code></pre> object gives us.</div><div class="paragraph">Another example of non-composable code that’s talked about less than asynchronous code are loops, or more generally, functions that return multiple values such as lists. Let’s take a look at an example:</div><div class="code-container"><pre style="display:block;overflow-x:auto;background:black;color:#eaeaea;padding:30px"><code><span style="color:#969896">// [&quot;hello&quot;, &quot;world&quot;] -&gt; [&quot;hello!&quot;, &quot;world!&quot;]</span>
+<span class="hljs-function">List&lt;String&gt; <span style="color:#7aa6da">addExcitement</span><span style="color:#e78c45">(List&lt;String&gt; words)</span> </span>{
+  List&lt;String&gt; output = <span style="color:#c397d8">new</span> LinkedList&lt;&gt;();
+  <span style="color:#c397d8">for</span> (<span style="color:#c397d8">int</span> i = <span style="color:#e78c45">0</span>; i &lt; words.size(); i++) {
+    output.add(words.get(i) + “!”);
+  }
+  <span style="color:#c397d8">return</span> output;
+}
+
+<span style="color:#969896">// [&quot;hello&quot;, &quot;world&quot;] -&gt; [&quot;hello!!&quot;, &quot;world!!&quot;]</span>
+<span class="hljs-function">List&lt;String&gt; <span style="color:#7aa6da">addMoreExcitement</span><span style="color:#e78c45">(List&lt;String&gt; words)</span> </span>{
+  <span style="color:#c397d8">return</span> addExcitement(addExcitement(words));
+}</code></pre></div><div class="paragraph">We’ve composed the function that adds a single exclamation point into one that adds two. This works, but it’s inefficient because it loops through the loop twice instead of just once. We could go back and modify the original function but as before this breaks the abstraction.</div><div class="paragraph">This is a bit of a contrived example but if you imagine the code scattered around across a larger codebase then it illustrates an important point: in large systems when you’re trying to break things into modules the operations on one piece of data won’t all live together. You have to make a choice between modularity or performance.</div><blockquote>With imperative programming you can only get one of modularity or performance. With functional programming you can have both.</blockquote><div class="paragraph">The functional programmer’s answer to this (in Java 8 at least) is the <pre><code>Stream</code></pre>. A <pre><code>Stream</code></pre> is lazy by default which means it only loops through the data when it is absolutely necessary. In other words the function is “lazy”: it only starts doing work when asked for a result (The functional programming language Haskell is built around the concept of laziness). </div><div class="paragraph">Let’s rewrite the above example using a <pre><code>Stream</code></pre> instead:</div><div class="code-container"><pre style="display:block;overflow-x:auto;background:black;color:#eaeaea;padding:30px"><code><span class="hljs-function">String <span style="color:#7aa6da">addExcitement</span><span style="color:#e78c45">(String word)</span> </span>{
+  <span style="color:#c397d8">return</span> word + <span style="color:#b9ca4a">&quot;!&quot;</span>;
+}
+
+list.toStream()
+  .map(<span style="color:#c397d8">this</span>::addExcitement)
+  .map(<span style="color:#c397d8">this</span>::addExcitement)
+  .collect(Collectors.toList())</code></pre></div><div class="paragraph">This will only loop around the list once and call the <pre><code>addExcitement</code></pre> function twice on each element. Again we need to imagine our code operating on the same piece of data across multiple parts of the application. Without a lazy structure like the <pre><code>Stream</code></pre>, trying to increase performance by consolidating all list traversals into one place would mean breaking apart existing functions. With a lazy object you can achieve both modularity and performance because the traversals are deferred until the end.</div><div class="Divider"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="paragraph">Now that we’ve seen some examples, let’s return to the task of figuring out what properties made some functions easier to compose than others. We have seen that things like null objects, callbacks, and loops do not compose well. On the other hand, optionals, promises, and streams do compose well. Why is that?</div><div class="paragraph">The answer is that the composable examples have a clean separation between <strong>what</strong> you want to do and <strong>how</strong> you actually do it.</div><div class="paragraph">In all these previous examples, there’s one thing in common. The functional way of doing things focuses on what you want the result to be. The iterative way of doing things focuses on how you actually get there, the implementation details. Turns out that stitching together iterative instructions on how to do things does not compose as well as high level descriptions of what should be done.</div><div class="paragraph">For example in the case of promises: the <strong>what </strong>in this case is making one HTTP call followed by another one. The <strong>how </strong>is irrelevant and abstracted away: maybe it uses thread pools, mutex locks, etc. but it doesn’t matter.</div><div class="paragraph"><em>Functional programming is separating </em><em><strong>what</strong></em><em> you want the result to be <br/>from </em><em><strong>how</strong></em><em> that result is achieved.</em></div><div class="paragraph">Indeed, that’s my practical definition of functional programming. We want to have a clear separation of concerns in our programs. The “what you want” part is nice and composable and makes it easy to build larger things from smaller ones. The “how you do it” part is required at some point, but by separating it out we keep the stuff that’s not-so-compositional out of the way of the stuff that is more compositional.</div><div class="paragraph">We can see this in real world examples:</div><ul><li>Apache Spark’s API for performing computations on large data sets abstracts away the details of which machines will run it and where the data lives</li><li>React.js describes a view and leaves the diffing of the DOM up to an efficient algorithm</li></ul><div class="paragraph">Even if you’re not using a functional programming language, separating out the what and the how of your programs will make them more composable.</div><div class="Divider"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="paragraph"><em>Thanks to Dmitriy Afanasyev.</em></div>
+          
+          <h2 class="tags-header">Tags</h2>
+          <div class="archive-tags">
+            
+            
+            
+            <a class="tag" href="https://hackernoon.com/tagged/functional-programming">Functional Programming</a>
+            
+            
+            
+            <a class="tag" href="https://hackernoon.com/tagged/programming">Programming</a>
+            
+            
+            
+            <a class="tag" href="https://hackernoon.com/tagged/computer-science">Computer Science</a>
+            
+            
+            
+            <a class="tag" href="https://hackernoon.com/tagged/java">Java</a>
+            
+            
+            
+            <a class="tag" href="https://hackernoon.com/tagged/javascript">Javascript</a>
+            
+            
+            
+            <a class="tag" href="https://hackernoon.com/tagged/software-development">Software Development</a>
+            
+            
+            
+            <a class="tag" href="https://hackernoon.com/tagged/code-quality">Code Quality</a>
+            
+            
+            
+            <a class="tag" href="https://hackernoon.com/tagged/code-composition">Code Composition</a>
+            
+          </div>
+          
+
+          
+
+          
+          <div class="twitter-discussion">
+            <a target="_blank" href="https://community.hackernoon.com/t/24168">Continue the Discussion <i class="fas fa-comments-alt"></i></a>
+          </div>
+          
+        </div>
+      </div>
+
+      <div class="more">
+        
+        <div class="divider-title">
+          <div class="divider"></div>
+          <h1 class="more-heading">More by Steven Heidel</h1>
+          <div class="divider"></div>
+        </div>
+
+        <div class="more-content">
+          
+          
+          
+          <div class="story-card">
+            <a href="what-i-learned-from-doing-1000-code-reviews-fe28d4d11c71">
+              
+              
+              
+              <div class="img" style="background-image: url('https://hackernoon.com/hn-images/1*Vv0HNvRhU0ihKVaBIpDUww.jpeg')"></div>
+            </a>
+            <div class="excerpt">
+              <div class="title">
+                <a href="what-i-learned-from-doing-1000-code-reviews-fe28d4d11c71">What I Learned From Doing 1000 Code Reviews</a>
+              </div>
+              <div class="bio">
+                <div class="flex">
+                  
+                  <a href="/@stevenheidel"><div class="avatar" style="background-image: url(https://hackernoon.com/avatars/QlGsBtM2mvgzjlG7cS9UX3SIHAJ3.png)"></div></a>
+                  <div>
+                    <a href="/@stevenheidel" class="name">Steven Heidel</a>
+                    <div class="published">January 9</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            
+            
+            
+            <a class="tag" href="https://hackernoon.com/tagged/programming">Programming</a>
+            
+          </div>
+          
+          
+          
+          
+          
+          
+          
+          <div class="story-card">
+            <a href="a-factoryfactoryfactory-in-production-822478b5afbd">
+              
+              
+              
+              <div class="img" style="background-image: url('https://images.unsplash.com/photo-1556636530-6b7482d80e3d?ixlib=rb-1.2.1&q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=1080&fit=max&ixid=eyJhcHBfaWQiOjEwMDk2Mn0')"></div>
+            </a>
+            <div class="excerpt">
+              <div class="title">
+                <a href="a-factoryfactoryfactory-in-production-822478b5afbd">A FactoryFactoryFactory in Production</a>
+              </div>
+              <div class="bio">
+                <div class="flex">
+                  
+                  <a href="/@stevenheidel"><div class="avatar" style="background-image: url(https://hackernoon.com/avatars/QlGsBtM2mvgzjlG7cS9UX3SIHAJ3.png)"></div></a>
+                  <div>
+                    <a href="/@stevenheidel" class="name">Steven Heidel</a>
+                    <div class="published">January 8</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            
+            
+            
+            <a class="tag" href="https://hackernoon.com/tagged/programming">Programming</a>
+            
+          </div>
+          
+          
+          
+          <div class="story-card">
+            <a href="what-i-learned-from-doing-1000-code-reviews-fe28d4d11c71">
+              
+              
+              
+              <div class="img" style="background-image: url('https://hackernoon.com/hn-images/1*Vv0HNvRhU0ihKVaBIpDUww.jpeg')"></div>
+            </a>
+            <div class="excerpt">
+              <div class="title">
+                <a href="what-i-learned-from-doing-1000-code-reviews-fe28d4d11c71">What I learned from doing 1000 code reviews</a>
+              </div>
+              <div class="bio">
+                <div class="flex">
+                  
+                  <a href="/@stevenheidel"><div class="avatar" style="background-image: url(https://hackernoon.com/archive-avatars/stevenheidel)"></div></a>
+                  <div>
+                    <a href="/@stevenheidel" class="name">Steven Heidel</a>
+                    <div class="published">November 5</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            
+            
+            
+            <a class="tag" href="https://hackernoon.com/tagged/programming">Programming</a>
+            
+          </div>
+          
+          
+          
+          <div class="story-card">
+            <a href="a-factoryfactoryfactory-in-production-822478b5afbd">
+              
+              
+              
+              <div class="img" style="background-image: url('https://hackernoon.com/Devimg/story-image-default.png')"></div>
+            </a>
+            <div class="excerpt">
+              <div class="title">
+                <a href="a-factoryfactoryfactory-in-production-822478b5afbd">A FactoryFactoryFactory in Production</a>
+              </div>
+              <div class="bio">
+                <div class="flex">
+                  
+                  <a href="/@stevenheidel"><div class="avatar" style="background-image: url(https://hackernoon.com/archive-avatars/stevenheidel)"></div></a>
+                  <div>
+                    <a href="/@stevenheidel" class="name">Steven Heidel</a>
+                    <div class="published">August 28</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            
+            
+            
+            <a class="tag" href="https://hackernoon.com/tagged/programming">Programming</a>
+            
+          </div>
+          
+          
+          
+          
+          
+          
+          <div class="story-spacer"></div><div class="story-spacer"></div>
+          
+        </div>
+        
+
+        <div id="subscribe-embed">
+          <!-- Begin Mailchimp Signup Form -->
+          <div id="mc_embed_signup">
+              <img class="signup-image" src="https://ucarecdn.com/57662ddc-da7c-407b-afcb-cb45184b2705/" alt="" />
+            <form action="https://hackernoon.us19.list-manage.com/subscribe/post?u=b48b0ec2173fecf2586c00e80&amp;id=fa796741e6" method="post" id="mc-embedded-subscribe-form" name="mc-embedded-subscribe-form" class="validate" target="_blank" novalidate>
+              <div class="subscribe-header">
+                <h2>Hackernoon Newsletter curates great stories by real tech professionals</h2>
+                  <p>Get solid gold sent to your inbox. Every week!</p>
+                  </div>
+            <div class="mc-field-group">
+            </label>
+              <input type="email" value="" name="EMAIL" class="required email" id="mce-EMAIL" placeholder="Email Address *">
+            </div>
+            <div class="fields-group">
+              <div class="mc-field-group">
+              <input type="text" value="" name="MMERGE1" class="" id="mce-MMERGE1" placeholder="First Name">
+            </div>
+            <div class="mc-field-group">
+              <input type="text" value="" name="MMERGE2" class="" id="mce-MMERGE2" placeholder="Last Name">
+            </div>
+                  </div>
+            <div class="mc-field-group input-group topics-list">
+                <strong>Topics of interest </strong>
+                <ul><li class="checkbox"><input checked type="checkbox" value="1" name="group[3757][1]" id="mce-group[3757]-3757-0"><label for="mce-group[3757]-3757-0">Software Development</label></li>
+            <li class="checkbox"><input checked type="checkbox" value="2" name="group[3757][2]" id="mce-group[3757]-3757-1"><label for="mce-group[3757]-3757-1">Blockchain Crypto</label></li>
+            <li class="checkbox"><input checked type="checkbox" value="4" name="group[3757][4]" id="mce-group[3757]-3757-2"><label for="mce-group[3757]-3757-2">General Tech</label></li>
+            <li class="checkbox"><input checked type="checkbox" value="8" name="group[3757][8]" id="mce-group[3757]-3757-3"><label for="mce-group[3757]-3757-3">Best of Hacker Noon</label></li>
+            </ul>
+            </div>
+              <div id="mce-responses" class="clear">
+                <div class="response" id="mce-error-response" style="display:none"></div>
+                <div class="response" id="mce-success-response" style="display:none"></div>
+              </div>    <!-- real people should not fill this in and expect good things - do not remove this or risk form bot signups-->
+                <div style="position: absolute; left: -5000px;" aria-hidden="true"><input type="text" name="b_b48b0ec2173fecf2586c00e80_fa796741e6" tabindex="-1" value=""></div>
+                <div class="submit-btn"><input type="submit" value="Get great stories by email" name="subscribe" id="mc-embedded-subscribe" class="button"></div>
+            </form>
+          </div>
+          <!--End mc_embed_signup-->
+        </div>
+
+        
+      </div>
+    </div>
+
+    <div class="subnav footer">
+      <a href="https://www.hackernoon.com"><img class="footer__logo" src="/Devimg/hn-logo.png" width="45" height="45" /></a>
+      <div>
+        <div class="footer__links">
+          <a href="http://help.hackernoon.com">Help</a>
+          <a href="https://hackernoon.com/hacker-noon-faqs-with-six-word-answers-aw1ls3z1q">About</a>
+          <a href="https://community.hackernoon.com/session/sso?return_path=https%3A%2F%2Fapp.hackernoon.com">Start Writing</a>
+          <a class="footer__sponsor" href="http://sponsor.hackernoon.com">Sponsor:</a>
+          <a class="footer__sponsor-type" href="https://sponsor.hackernoon.com/#brandasauthor">Brand-as-Author</a>
+          <a class="footer__sponsor-type" href="https://sponsor.hackernoon.com/#billboard">Sitewide Billboard</a>
+        </div>
+        <div class="footer__privacy-links">
+          <a href="mailto:support@hackernoon.com">Contact Us</a>
+          <a href="http://privacy.hackernoon.com">Privacy</a>
+          <a href="http://terms.hackernoon.com">Terms</a>
+        </div>
+      </div>
+      <div>
+          <a href="https://twitter.com/hackernoon" rel="noopener noreferrer" target="_blank"><i class="fab fa-twitter"></i></a>
+          <a href="https://www.facebook.com/hackernoon" rel="noopener noreferrer" target="_blank"><i class="fab fa-facebook-f"></i></a>
+          <a href="https://www.linkedin.com/company/hackernoon/" rel="noopener noreferrer" target="_blank"><i class="fab fa-linkedin"></i></a>
+          <a href="https://www.youtube.com/hackernoon" rel="noopener noreferrer" target="_blank"><i class="fab fa-youtube"></i></a>
+      </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/6.3.4/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/6.3.4/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/6.3.4/firebase-firestore.js"></script>
+    <script>
+    // Initialize Firebase
+    var config = {
+      apiKey: "AIzaSyCjRAcAgsxlffnuZNIr4zOGaIsEKKEaJCg",
+      authDomain: "hackernoon-app.firebaseapp.com",
+      databaseURL: "https://hackernoon-app.firebaseio.com",
+      projectId: "hackernoon-app",
+      storageBucket: "hackernoon-app.appspot.com",
+      messagingSenderId: "521962009898"
+    };
+    firebase.initializeApp(config);
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/js-cookie@2/src/js.cookie.min.js"></script>
+
+    <script src="/interact.js"></script>
+    <script src="/story.js"></script>
+
+    <script async src="/services.js"></script>
+    <script sync src="https://platform.twitter.com/widgets.js"></script>
+    <script>
+    window.onload = (function(){
+      document.querySelectorAll('.tweet-container .tweet').forEach(function(tweet) {
+        let id = tweet.getAttribute("tweetid");
+        twttr.widgets.createTweet(id, tweet, {
+          linkColor: '#00ff00',
+          theme: 'dark'
+        })
+      });
+    });
+    </script>
+    <script>window.upsettings = {'api_key': '24b4421e-81ec-0b84b6a2'}</script><script>(function(){var w=window;var up=w.Upscribe;if(typeof up==="function"){up('reattach_activator');up('update',upsettings);}else{var d=document;var i=function(){i.c(arguments)};i.q=[];i.c=function(args){i.q.push(args)};w.Upscribe=i;function l(){var s=d.createElement('script');s.type='text/javascript';s.async=true;s.src='https://upscri.be/js/snippet.js';var x=d.getElementsByTagName('script')[0];x.parentNode.insertBefore(s,x);}if( w.attachEvent){w.attachEvent('onload',l);}else{w.addEventListener('load',l,false);}}})()</script>
+
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-65623566-4"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+   gtag('js', new Date());
+
+   gtag('config', 'UA-65623566-4', { 'optimize_id': 'GTM-NR267TL'});
+  </script>
+  <script src="/subscribeform.js"></script>
+  <script async src='//s3.amazonaws.com/downloads.mailchimp.com/js/mc-validate.js'></script>
+</body>
+</html>
