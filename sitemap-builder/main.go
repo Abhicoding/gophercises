@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/xml"
-	"errors"
+	"flag"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -10,6 +10,9 @@ import (
 
 	"golang.org/x/net/html"
 )
+
+var maxDepth = uint64(3)
+var defaultURL = "https://www.noisli.com/"
 
 type UrlSet struct {
 	XMLName xml.Name `xml:"urlset"`
@@ -21,44 +24,40 @@ type Url struct {
 
 func main() {
 	var siteMap UrlSet
-	args := os.Args
-	URL := args[len(args)-1]
-	u, _ := url.Parse(URL)
-	resp, err := http.Get(u.String())
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	z, err := html.Parse(resp.Body)
+	var temp []*html.Node
+	var childNodes map[string]bool
 
-	if err != nil {
-		fmt.Println(err)
-		return
+	URL := flag.String("u", defaultURL, "Page to create site-map for")
+	max := flag.Uint64("m", maxDepth, "Max site-map depth")
+	flag.Parse()
+
+	u, _ := url.Parse(*URL)
+	anchorNodes := getChildURLs(u.String())
+	childNodes = FilterSiteLinks(anchorNodes, u, nil)
+	for currentDepth := uint64(1); currentDepth < *max; currentDepth++ {
+		for k, _ := range childNodes {
+			temp = append(temp, getChildURLs(k)...)
+		}
 	}
-	html, _ := FindHTML(z)
-	anchorNodes := Crawler(html)
-	filteredTags := FilterSiteLinks(anchorNodes, u)
+	filteredTags := FilterSiteLinks(temp, u, childNodes)
+
 	siteMap = getSiteMap(filteredTags)
-
 	printXML(siteMap)
-	defer resp.Body.Close()
 }
 
-func FindHTML(doc *html.Node) (*html.Node, error) {
-	if doc.DataAtom.String() == "html" {
-		return doc, nil
+func getChildURLs(u string) []*html.Node {
+	uu, _ := url.Parse(u)
+	resp, err := http.Get(uu.String())
+	if err != nil {
+		return nil
 	}
-	if doc == nil {
-		return nil, errors.New("No HTML tag found")
+	z, err := html.Parse(resp.Body)
+	defer resp.Body.Close()
+	if err != nil {
+		return nil
 	}
-	for elem := doc.FirstChild; elem != nil; elem = elem.NextSibling {
-		newElem, err := FindHTML(elem)
-		if err != nil {
-			continue
-		}
-		return newElem, nil
-	}
-	return nil, errors.New("No HTML tag found")
+	anchorNodes := Crawler(z)
+	return anchorNodes
 }
 
 func GetChildNodes(n *html.Node) []*html.Node {
@@ -128,8 +127,10 @@ func Traverse(Nodes, childNodes []*html.Node) []*html.Node {
 	return Traverse(append(Nodes, childNodes...), nextChildNodes)
 }
 
-func FilterSiteLinks(list []*html.Node, URL *url.URL) map[string]bool {
-	temp := make(map[string]bool)
+func FilterSiteLinks(list []*html.Node, URL *url.URL, temp map[string]bool) map[string]bool {
+	if temp == nil {
+		temp = make(map[string]bool)
+	}
 	for _, tag := range list {
 		for _, attr := range tag.Attr {
 			if attr.Key == "href" {
