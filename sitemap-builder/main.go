@@ -4,8 +4,8 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 
 	"golang.org/x/net/html"
@@ -20,16 +20,16 @@ type Url struct {
 }
 
 func main() {
+	var siteMap UrlSet
 	args := os.Args
-	url := args[len(args)-1]
-	resp, err := http.Get(url)
+	URL := args[len(args)-1]
+	u, _ := url.Parse(URL)
+	resp, err := http.Get(u.String())
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	z, err := html.Parse(resp.Body)
-	body, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println(string(body))
 
 	if err != nil {
 		fmt.Println(err)
@@ -37,8 +37,10 @@ func main() {
 	}
 	html, _ := FindHTML(z)
 	anchorNodes := Crawler(html)
-	printAnchorNodes(anchorNodes)
-	//printChild(anchorTags)
+	filteredTags := FilterSiteLinks(anchorNodes, u)
+	siteMap = getSiteMap(filteredTags)
+
+	printXML(siteMap)
 	defer resp.Body.Close()
 }
 
@@ -83,9 +85,11 @@ func FilterAnchorNodes(nodes []*html.Node) []*html.Node {
 	return anchorNodes
 }
 
-func printChild(childTags []*html.Node) {
-	for _, tag := range childTags {
-		fmt.Println(tag.DataAtom.String())
+func printXML(siteMap UrlSet) {
+	enc := xml.NewEncoder(os.Stdout)
+	enc.Indent("  ", "    ")
+	if err := enc.Encode(siteMap); err != nil {
+		fmt.Printf("error: %v\n", err)
 	}
 }
 
@@ -108,7 +112,6 @@ func Crawler(n *html.Node) []*html.Node {
 	}
 	childNodes = Traverse([]*html.Node{n}, childNodes)
 	anchorNodes = FilterAnchorNodes(childNodes)
-	printChild(anchorNodes)
 	return anchorNodes
 }
 
@@ -123,4 +126,49 @@ func Traverse(Nodes, childNodes []*html.Node) []*html.Node {
 		return append(Nodes, childNodes...)
 	}
 	return Traverse(append(Nodes, childNodes...), nextChildNodes)
+}
+
+func FilterSiteLinks(list []*html.Node, URL *url.URL) map[string]bool {
+	temp := make(map[string]bool)
+	for _, tag := range list {
+		for _, attr := range tag.Attr {
+			if attr.Key == "href" {
+				u, _ := url.Parse(attr.Val)
+				if u.Host == "" && u.Fragment != "" {
+					continue
+				}
+				if u.Scheme == "" {
+					u.Scheme = URL.Scheme
+				}
+				if u.Scheme != URL.Scheme {
+					continue
+				}
+				if u.Host == "" {
+					u.Host = URL.Hostname()
+				}
+				if u.Hostname() == URL.Hostname() {
+					if _, ok := temp[u.String()]; !ok {
+						temp[u.String()] = true
+						continue
+					}
+					continue
+				}
+
+				continue
+			}
+			continue
+		}
+	}
+	return temp
+}
+
+func getSiteMap(links map[string]bool) UrlSet {
+	var siteMap UrlSet
+	for k, _ := range links {
+		uu := Url{
+			Loc: k,
+		}
+		siteMap.Url = append(siteMap.Url, &uu)
+	}
+	return siteMap
 }
