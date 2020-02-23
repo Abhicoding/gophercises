@@ -18,10 +18,8 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -50,148 +48,6 @@ var rootCmd = &cobra.Command{
 	// Run: func(cmd *cobra.Command, args []string) {
 	// 	fmt.Println("adding task")
 	// },
-}
-
-var addCmd = &cobra.Command{
-	Use:   "add",
-	Short: "Add a task to todo list",
-	Long:  `Adds a new task to your list.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		task := strings.Join(args, " ")
-
-		db, err := bolt.Open("cli-task-manager.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
-		if err != nil {
-			log.Fatal(err)
-		}
-		s := Store{db: db}
-		defer s.db.Close()
-
-		err = s.db.Update(func(tx *bolt.Tx) error {
-			_, err := tx.CreateBucketIfNotExists([]byte("incomplete_tasks"))
-			if err != nil {
-				return fmt.Errorf("create bucket: %s\n", err)
-			}
-			return nil
-		})
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		err = s.CreateTask(task)
-		if err != nil {
-			fmt.Println("Failed to add task %s\n", task)
-			fmt.Errorf("Failed to add task %s\n", err)
-			return
-		}
-		fmt.Printf("Task added successfully: %s\n", task)
-	},
-}
-
-var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "Lists all of your incomplete tasks",
-	Long:  `Lists all of your incomplete tasks.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		db, err := bolt.Open("cli-task-manager.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
-		if err != nil {
-			log.Fatal(err)
-		}
-		s := Store{db: db}
-		defer s.db.Close()
-		tasks, err := s.GetTask()
-		if err != nil {
-			fmt.Errorf("Failed to get tasks: %s\n", err)
-			return
-		}
-		if len(tasks) == 0 {
-			fmt.Printf("No pending tasks for today!\n")
-			return
-		}
-		printTasks(tasks)
-	},
-}
-
-var doCmd = &cobra.Command{
-	Use:   "do",
-	Short: "Marks a task as complete",
-	Long:  `Marks a task as complete`,
-	Run: func(cmd *cobra.Command, args []string) {
-		id := strings.Join(args, " ")
-
-		db, err := bolt.Open("cli-task-manager.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
-		if err != nil {
-			log.Fatal(err)
-		}
-		s := Store{db: db}
-		defer s.db.Close()
-
-		err = s.db.Update(func(tx *bolt.Tx) error {
-			_, err := tx.CreateBucketIfNotExists([]byte("completed_tasks"))
-			if err != nil {
-				return fmt.Errorf("create bucket: %s\n", err)
-			}
-			return nil
-		})
-
-		t, err := s.CompleteTask(id)
-		if err != nil {
-			fmt.Errorf("%s", err)
-			return
-		}
-		fmt.Printf("You have completed the \"%s\" task.\n", *t)
-		return
-	},
-}
-
-var completedCmd = &cobra.Command{
-	Use:   "completed",
-	Short: "Lists completed tasks",
-	Long:  `Gives a list of tasks completed in last 24 hrs.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		db, err := bolt.Open("cli-task-manager.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
-		if err != nil {
-			log.Fatal(err)
-		}
-		s := Store{db: db}
-		defer s.db.Close()
-
-		t, err := s.GetCompletedTasks()
-		if err != nil {
-			fmt.Errorf("%s", err)
-			return
-		}
-		if t == nil {
-			fmt.Printf("No tasks completed in last 24hrs :(\n")
-			return
-		}
-		printCompletedTasks(t)
-		return
-	},
-}
-
-var removeCmd = &cobra.Command{
-	Use:   "rm",
-	Short: "Removes incomplete tasks",
-	Long:  `Removes task from the list`,
-	Run: func(cmd *cobra.Command, args []string) {
-		id := strings.Join(args, "")
-		db, err := bolt.Open("cli-task-manager.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
-		if err != nil {
-			log.Fatal(err)
-		}
-		s := Store{db: db}
-		defer s.db.Close()
-		task, err := s.RemoveInCompleteTask(id)
-		if err != nil {
-			fmt.Errorf("%s", err)
-			return
-		}
-		if task == nil {
-			fmt.Printf("No task found for id %s\n", id)
-			return
-		}
-		fmt.Printf("Successfully removed task: %s\n", *task)
-	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
