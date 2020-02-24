@@ -30,7 +30,7 @@ var doCmd = &cobra.Command{
 
 		for _, id := range ids {
 			task := allTasks[id-1]
-			_, err := s.CompleteTask(task.Key)
+			err := s.CompleteTask(task.Key)
 			if err != nil {
 				fmt.Errorf("%s", err)
 				continue

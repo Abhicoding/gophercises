@@ -94,31 +94,45 @@ func (s *Store) GetCompletedTasks() ([]string, error) {
 }
 
 //CompleteTask : completes the task with given id
-func (s *Store) CompleteTask(id int) (*string, error) {
+func (s *Store) CompleteTask(id int) error {
+	// return s.DB.Update(func(tx *bolt.Tx) error {
+	// 	taskID := itob(id)
+	// 	bOne := tx.Bucket(incompleteTaskBucket)
+	// 	task := bOne.Get(taskID)
+	// 	if err := bOne.Delete(taskID); err != nil {
+	// 		return err
+	// 	}
+	// 	bTwo := tx.Bucket(completedTaskBucket)
+	// 	t := time.Now()
+
+	// 	if err := bTwo.Put([]byte(t.Format(time.RFC3339)), task); err != nil {
+	// 		return err
+	// 	}
+	// 	return nil
+	// })
 	tx, err := s.DB.Begin(true)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer tx.Rollback()
 	taskID := itob(id)
 	bOne := tx.Bucket(incompleteTaskBucket)
 	task := bOne.Get(taskID)
 	if err = bOne.Delete(taskID); err != nil {
-		return nil, err
+		return err
 	}
 
 	bTwo := tx.Bucket(completedTaskBucket)
 	t := time.Now()
 
 	if err = bTwo.Put([]byte(t.Format(time.RFC3339)), task); err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := tx.Commit(); err != nil {
-		return nil, err
+		return err
 	}
-	T := string(task)
-	return &T, nil
+	return nil
 }
 
 //RemoveIncompleteTask: Removes incomplete task from the list
