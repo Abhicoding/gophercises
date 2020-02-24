@@ -2,11 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"strings"
-	"time"
 
-	"github.com/boltdb/bolt"
+	"github.com/gophercises/cli-task-manager/models"
 	"github.com/spf13/cobra"
 )
 
@@ -16,15 +14,13 @@ var removeCmd = &cobra.Command{
 	Long:  `Removes task from the list`,
 	Run: func(cmd *cobra.Command, args []string) {
 		id := strings.Join(args, "")
-		db, err := bolt.Open("cli-task-manager.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
+
+		s := models.S
+		defer s.DB.Close()
+
+		task, err := s.RemoveIncompleteTask(id)
 		if err != nil {
-			log.Fatal(err)
-		}
-		s := Store{db: db}
-		defer s.db.Close()
-		task, err := s.RemoveInCompleteTask(id)
-		if err != nil {
-			fmt.Errorf("%s", err)
+			fmt.Errorf("Something went wrong: %s", err)
 			return
 		}
 		if task == nil {

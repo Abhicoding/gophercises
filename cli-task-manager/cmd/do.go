@@ -2,11 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"log"
-	"strings"
-	"time"
+	"strconv"
 
-	"github.com/boltdb/bolt"
+	"github.com/gophercises/cli-task-manager/models"
 	"github.com/spf13/cobra"
 )
 
@@ -15,29 +13,30 @@ var doCmd = &cobra.Command{
 	Short: "Marks a task as complete",
 	Long:  `Marks a task as complete`,
 	Run: func(cmd *cobra.Command, args []string) {
-		id := strings.Join(args, " ")
+		var ids []int
 
-		db, err := bolt.Open("cli-task-manager.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
-		if err != nil {
-			log.Fatal(err)
-		}
-		s := Store{db: db}
-		defer s.db.Close()
+		s := models.S
+		defer s.DB.Close()
+		allTasks, _ := s.GetTask()
 
-		err = s.db.Update(func(tx *bolt.Tx) error {
-			_, err := tx.CreateBucketIfNotExists([]byte("completed_tasks"))
-			if err != nil {
-				return fmt.Errorf("create bucket: %s\n", err)
+		for _, k := range args {
+			id, err := strconv.Atoi(k)
+			if err != nil || id <= 0 || id > len(allTasks) {
+				fmt.Printf("Invalid task number: %s\n", k)
+				continue
 			}
-			return nil
-		})
-
-		t, err := s.CompleteTask(id)
-		if err != nil {
-			fmt.Errorf("%s", err)
-			return
+			ids = append(ids, id)
 		}
-		fmt.Printf("You have completed the \"%s\" task.\n", *t)
+
+		for _, id := range ids {
+			task := allTasks[id-1]
+			_, err := s.CompleteTask(task.Key)
+			if err != nil {
+				fmt.Errorf("%s", err)
+				continue
+			}
+			fmt.Printf("You have completed task: \"%s\" \n", task.Value)
+		}
 		return
 	},
 }

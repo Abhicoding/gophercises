@@ -2,11 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"strings"
-	"time"
 
-	"github.com/boltdb/bolt"
+	"github.com/gophercises/cli-task-manager/models"
 	"github.com/spf13/cobra"
 )
 
@@ -17,30 +15,15 @@ var addCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		task := strings.Join(args, " ")
 
-		db, err := bolt.Open("cli-task-manager.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
-		if err != nil {
-			log.Fatal(err)
-		}
-		s := Store{db: db}
-		defer s.db.Close()
+		s := models.S
+		defer s.DB.Close()
 
-		err = s.db.Update(func(tx *bolt.Tx) error {
-			_, err := tx.CreateBucketIfNotExists([]byte("incomplete_tasks"))
-			if err != nil {
-				return fmt.Errorf("create bucket: %s\n", err)
-			}
-			return nil
-		})
+		err := s.CreateTask(task)
 		if err != nil {
-			log.Fatal(err)
-		}
-
-		err = s.CreateTask(task)
-		if err != nil {
-			fmt.Printf("Failed to add task %s\n", task)
-			fmt.Printf("Failed to add task %s\n", err.Error())
+			fmt.Errorf("Failed to add task: %s", err)
 			return
 		}
+
 		fmt.Printf("Task added successfully: %s\n", task)
 	},
 }
