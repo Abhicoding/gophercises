@@ -17,8 +17,12 @@ package main
 
 import (
 	"github.com/gophercises/cli-task-manager/cmd"
+	"github.com/gophercises/cli-task-manager/models"
+	"github.com/mitchellh/go-homedir"
 )
 
 func main() {
+	homePath, _ := homedir.Dir()
+	models.Init(homePath)
 	cmd.Execute()
 }
